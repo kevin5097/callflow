@@ -1,0 +1,16 @@
+{
+  "name": "sip-flow-ai-analyzer",
+  "version": "1.0.0",
+  "description": "AI 기반 SIP 로그 시각화 도구",
+  "type": "module",
+  "scripts": {
+    "start": "next start",
+    "dev": "next dev"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
