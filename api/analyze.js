@@ -1,20 +1,43 @@
 export default async function handler(req, res) {
-  const { log } = req.body;
-  const API_KEY = process.env.GEMINI_API_KEY; // Vercel 환경변수에서 로드
+  try {
+    const API_KEY = process.env.GEMINI_API_KEY;
 
-  const prompt = `당신은 SIP,inap   엔지니어입니다. 다음 로그를 분석해 Mermaid 시퀀스 다이어그램 코드로 변환하세요. 
-  반드시 외부IP, Proxy, 내부망을 구분하고 차단 사유(Q.850 등)가 있다면 주석을 다세요. 
-  응답은 반드시 mermaid 코드만 출력하세요.\n\n${log}`;
+    if (!API_KEY) {
+      return res.status(500).json({ error: "환경변수 GEMINI_API_KEY가 설정되지 않았습니다." });
+    }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-    method: 'POST',
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }]
-    })
-  });
+    const { log } = req.body;
+    if (!log) {
+      return res.status(400).json({ error: "분석할 로그 데이터가 없습니다." });
+    }
 
-  const json = await response.json();
-  const mermaidCode = json.candidates[0].content.parts[0].text;
-  
-  res.status(200).json({ mermaidCode });
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `아래 SIP 로그를 분석해서 mermaid.js 시퀀스 다이어그램 코드로 변환해줘. 오직 mermaid 코드만 답변해:\n\n${log}` }] }]
+      })
+    });
+
+    const data = await response.json();
+
+    // API 응답 에러 체크
+    if (data.error) {
+      console.error("Gemini API Error:", data.error);
+      return res.status(response.status).json({ error: data.error.message });
+    }
+
+    // candidates 존재 여부 체크 (에러 방지 핵심)
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error("No candidates found in response:", data);
+      return res.status(500).json({ error: "AI가 응답을 생성하지 못했습니다. 로그 형식을 확인해주세요." });
+    }
+
+    const mermaidCode = data.candidates[0].content.parts[0].text;
+    res.status(200).json({ mermaidCode });
+
+  } catch (error) {
+    console.error("Server Internal Error:", error);
+    res.status(500).json({ error: "서버 내부 오류가 발생했습니다: " + error.message });
+  }
 }
